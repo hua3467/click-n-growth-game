@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Click Game</title>
+</head>
+
+<body>
+    <h3 id="points">Points: <span>500</span></h3>
+    <button class="add-processor" id="btnAddProcessor">+Processor</button>
+    <button id="btnElse">Try something else.</button>
+    <button id="btnQuit">This is too boring. I'll quit.</button>
+    <div class="main-container"></div>
+
+    <script src="./lib/JDom@0.2.js"></script>
+
+    <script>
+        const pointDisplay = document.querySelector("#points span");
+        const btnAddProcessor = document.querySelector("#btnAddProcessor");
+        const btnElse = document.querySelector("#btnElse");
+        const btnQuit = document.querySelector("#btnQuit");
+
+        const gameData = {
+            points: 520,
+            price: {
+                processor: {
+                    base: 300,
+                    multiplier: 1.5
+                },
+                processorSpeed: {
+                    base: 100,
+                    multiplier: 1.5
+                },
+                automator: {
+                    base: 50,
+                    multiplier: 1.5
+                },
+                life: {
+                    base: 1000,
+                    multiplier: 2
+                }
+
+            },
+            processors: []
+        };
+
+        btnAddProcessor.addEventListener("click", e => {
+
+            if (gameData.points >= gameData.price.processor.base) {
+                createProcessor();
+                gameData.points -= gameData.price.processor.base;
+                gameData.price.processor.base = gameData.price.processor.base * gameData.price.processor.multiplier;
+                pointDisplay.innerText = gameData.points;
+            } else {
+                if(gameData.processors.length>0) {
+                    alert("You need 500 points to add a processor.")
+                } else {
+                    alert("Game Over.");
+                }
+                
+            }
+
+        })
+
+
+        function createProcessor() {
+
+            const duration = 10;
+
+            let processorData = {
+                id: Date.now(),
+                duration: duration,     // in seconds
+                speed: 3,    //3 pt per second.
+                timerRemain: duration,
+                isRunning: false,
+                life: 180       // duration in seconds.
+            }
+
+            gameData.processors.push(processorData);
+
+            new JDom({
+                type: "div",
+                attr: {
+                    className: "card-processor",
+                    id: `processor_${processorData.id}`
+                },
+                children: [
+                    {
+                        type: "p",
+                        conent: `${processorData.speed} pt/min`
+                    },
+                    {
+                        type: "p",
+                        content: `${processorData.duration} min`,
+                        attr: {
+                            className: "processor-time"
+                        }
+                    },
+                    {
+                        type: "button",
+                        content: `+Duration: ${processorData.duration}`,
+                        events: {
+                            click: e => {
+
+                                if (processorData.isRunning) {
+                                    alert("Wait. You cannot upgrade a running processor. ");
+                                } else {
+
+                                    if (gameData.points >= gameData.price.automator.base) {
+                                        gameData.points -= gameData.price.automator.base;
+                                        gameData.price.automator.base = gameData.price.automator.base * gameData.price.automator.multiplier;
+                                        pointDisplay.innerText = gameData.points;
+                                        processorData.duration = Math.round(processorData.duration * 1.5);
+                                        processorData.timerRemain = processorData.duration;
+                                        document.querySelector(`#processor_${processorData.id} .processor-time`).innerHTML = processorData.timerRemain;
+                                        e.target.innerText = `+Duration: ${processorData.duration}`;
+                                    } else {
+                                        alert("You don't have enough points.")
+                                    }
+
+                                }
+                            }
+                        }
+                    },
+                    {
+                        type: "button",
+                        content: `+ Speed: ${processorData.speed}`,
+                        events: {
+                            click: e => {
+
+                                if (processorData.isRunning) {
+
+                                    alert("Wait. You cannot upgrade a running processor. ");
+
+                                } else {
+
+                                    if (gameData.points >= gameData.price.processorSpeed.base) {
+                                        gameData.points -= gameData.price.processorSpeed.base;
+                                        gameData.price.processorSpeed.base = gameData.price.processorSpeed.base * gameData.price.processorSpeed.multiplier;
+                                        pointDisplay.innerText = gameData.points;
+                                        processorData.speed = Math.round(processorData.speed * 1.5);
+                                        e.target.innerText = `+ Speed: ${processorData.speed}`;
+
+                                    } else {
+                                        alert("You don't have enough points.")
+                                    }
+
+                                }
+                            }
+                        }
+                    },
+                    {
+                        type: "button",
+                        content: "Start Processor",
+                        attr: {
+                            className: "btn-active"
+                        },
+                        events: {
+                            click: e => {
+
+                                if (processorData.isRunning) {
+                                    alert("The processor is running now. Please wait until it finish the job.");
+                                } else {
+                                    e.target.classList.remove("btn-active");
+                                    let countDown;
+
+                                    countDown = setInterval(() => {
+
+                                        const processTimer = document.querySelector(`#processor_${processorData.id} .processor-time`)
+
+                                        processorData.isRunning = true;
+                                        processorData.timerRemain--;
+                                        if(processTimer !== null) {
+                                            processTimer.innerHTML = processorData.timerRemain;
+                                        }
+
+                                        addPoint(processorData.speed);
+
+                                        if (processorData.timerRemain <= 0) {
+                                            clearInterval(countDown);
+                                            processorData.timerRemain = processorData.duration;
+                                            processorData.isRunning = false;
+                                            console.log("The processor is stopped.");
+
+                                            if (gameData.points < gameData.price.processor.base && gameData.processors.length === 0) {
+                                                alert("You don't have enough points to continue. Game Over.");
+                                            }
+
+                                        }
+                                    }, 1000);
+                                }
+
+
+                            }
+                        }
+                    }
+                ]
+            }).render(".main-container");
+
+            setTimeout(() => {
+                document.querySelector(`#processor_${processorData.id}`).remove();
+                gameData.processors = gameData.processors.filter(obj => {
+                    return obj.id !== processorData.id;
+                });
+            }, processorData.life * 1000);
+
+        }
+
+        function addPoint(speed) {
+            gameData.points += speed;
+            pointDisplay.innerText = gameData.points;
+        }
+
+    </script>
+</body>
+
+</html>

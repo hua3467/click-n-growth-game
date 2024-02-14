@@ -8,7 +8,7 @@
 </head>
 
 <body>
-    <h3 id="points">Points: <span>500</span></h3>
+    <h3 id="points">Points: <span>3200</span></h3>
     <button class="add-processor" id="btnAddProcessor">+Processor</button>
     <button id="btnElse">Try something else.</button>
     <button id="btnQuit">This is too boring. I'll quit.</button>
@@ -23,35 +23,26 @@
         const btnQuit = document.querySelector("#btnQuit");
 
         const gameData = {
-            points: 520,
-            price: {
-                processor: {
-                    base: 300,
-                    multiplier: 1.5
-                },
-                processorSpeed: {
-                    base: 100,
-                    multiplier: 1.5
-                },
-                automator: {
-                    base: 50,
-                    multiplier: 1.5
-                },
-                life: {
-                    base: 1000,
-                    multiplier: 2
+            points: 3600,
+            processors: [],
+            init: {
+                    processorCost: 3000,
+                    speedCost: 400,
+                    automatorCost: 300,
+                    speed: 10,
+                    automator:10,
+                    life: 180
                 }
-
-            },
-            processors: []
         };
+
 
         btnAddProcessor.addEventListener("click", e => {
 
-            if (gameData.points >= gameData.price.processor.base) {
-                createProcessor();
-                gameData.points -= gameData.price.processor.base;
-                gameData.price.processor.base = gameData.price.processor.base * gameData.price.processor.multiplier;
+            if (gameData.points >= gameData.init.processorCost) {
+
+                createProcessor(gameData.init);
+
+                gameData.points -= gameData.init.processorCost;
                 pointDisplay.innerText = gameData.points;
             } else {
                 if(gameData.processors.length>0) {
@@ -65,17 +56,25 @@
         })
 
 
-        function createProcessor() {
+        function createProcessor(init) {
 
-            const duration = 10;
+            let duration = 10;
 
             let processorData = {
                 id: Date.now(),
-                duration: duration,     // in seconds
-                speed: 3,    //3 pt per second.
-                timerRemain: duration,
+                automatorDur: init.automator,     // in seconds
+                speed: init.speed,    //3 pt per second.
+                timerRemain: init.automator,
                 isRunning: false,
-                life: 180       // duration in seconds.
+                life: init.life,       // duration in seconds.
+                processorCost: init.processorCost,
+                speedCost: init.speedCost,
+                automatorCost: init.automatorCost,
+                processorLvl: 1,
+                upgradeLvl: {
+                    speed: 1,
+                    automator: 1
+                }
             }
 
             gameData.processors.push(processorData);
@@ -93,14 +92,14 @@
                     },
                     {
                         type: "p",
-                        content: `${processorData.duration} min`,
+                        content: `${processorData.automatorDur} min`,
                         attr: {
                             className: "processor-time"
                         }
                     },
                     {
                         type: "button",
-                        content: `+Duration: ${processorData.duration}`,
+                        content: `+Duration: ${processorData.automatorDur}`,
                         events: {
                             click: e => {
 
@@ -108,14 +107,20 @@
                                     alert("Wait. You cannot upgrade a running processor. ");
                                 } else {
 
-                                    if (gameData.points >= gameData.price.automator.base) {
-                                        gameData.points -= gameData.price.automator.base;
-                                        gameData.price.automator.base = gameData.price.automator.base * gameData.price.automator.multiplier;
+                                    if (gameData.points >= processorData.automatorCost) {
+
+                                        processorData.upgradeLvl.automator ++;
+                                        gameData.points -= processorData.automatorCost;
+                                        processorData.automatorDur = Math.round(processorData.automatorDur * 2);
+
+                                        processorData.automatorCost = processorData.automatorCost * processorData.upgradeLvl.automator;
                                         pointDisplay.innerText = gameData.points;
-                                        processorData.duration = Math.round(processorData.duration * 1.5);
-                                        processorData.timerRemain = processorData.duration;
+                                        processorData.timerRemain = processorData.automatorDur;
                                         document.querySelector(`#processor_${processorData.id} .processor-time`).innerHTML = processorData.timerRemain;
-                                        e.target.innerText = `+Duration: ${processorData.duration}`;
+                                        e.target.innerText = `+Duration: ${processorData.automatorDur}`;
+
+                                        console.log(processorData);
+
                                     } else {
                                         alert("You don't have enough points.")
                                     }
@@ -136,12 +141,17 @@
 
                                 } else {
 
-                                    if (gameData.points >= gameData.price.processorSpeed.base) {
-                                        gameData.points -= gameData.price.processorSpeed.base;
-                                        gameData.price.processorSpeed.base = gameData.price.processorSpeed.base * gameData.price.processorSpeed.multiplier;
+                                    if (gameData.points >= processorData.speedCost) {
+                                        
+                                        gameData.points -= processorData.speedCost;
+                                        processorData.upgradeLvl.speed ++;
+                                        processorData.speed = Math.round(processorData.speed * 2);
+
+                                        processorData.speedCost = processorData.speed * processorData.speed;
                                         pointDisplay.innerText = gameData.points;
-                                        processorData.speed = Math.round(processorData.speed * 1.5);
                                         e.target.innerText = `+ Speed: ${processorData.speed}`;
+
+                                        console.log(processorData);
 
                                     } else {
                                         alert("You don't have enough points.")
@@ -180,11 +190,11 @@
 
                                         if (processorData.timerRemain <= 0) {
                                             clearInterval(countDown);
-                                            processorData.timerRemain = processorData.duration;
+                                            processorData.timerRemain = processorData.automatorDur;
                                             processorData.isRunning = false;
                                             console.log("The processor is stopped.");
 
-                                            if (gameData.points < gameData.price.processor.base && gameData.processors.length === 0) {
+                                            if (gameData.points < gameData.init.processorCost && gameData.processors.length === 0) {
                                                 alert("You don't have enough points to continue. Game Over.");
                                             }
 

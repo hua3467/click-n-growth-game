@@ -5,13 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Click Game</title>
+    <link rel="stylesheet" href="./style.css">
 </head>
 
 <body>
     <h3 id="points">Points: <span>3200</span></h3>
     <button class="add-processor" id="btnAddProcessor">+Processor</button>
-    <button id="btnElse">Try something else.</button>
-    <button id="btnQuit">This is too boring. I'll quit.</button>
     <div class="main-container"></div>
 
     <script src="./lib/JDom@0.2.js"></script>
@@ -19,22 +18,99 @@
     <script>
         const pointDisplay = document.querySelector("#points span");
         const btnAddProcessor = document.querySelector("#btnAddProcessor");
-        const btnElse = document.querySelector("#btnElse");
-        const btnQuit = document.querySelector("#btnQuit");
 
         const gameData = {
-            points: 3600,
+            points: 3600,   //initial points
+            fuel: 100,   //initial fuel
+            fuelPrice: 10,   //price of fuel per second
             processors: [],
             init: {
-                    processorCost: 3000,
-                    speedCost: 400,
-                    automatorCost: 300,
-                    speed: 10,
-                    automator:10,
-                    life: 180
+                    processorCost: 2000,   //cost to add a processor
+                    speedUpgradeCost: 400,   //cost to upgrade speed
+                    fuelTankUpgradeCost: 300,   //cost to upgrade fuelTank
+                    repairCost: 1000,   //cost to repair a processor
+                    lifeUpgradeCost: 4000,   //cost to upgrade processor life
+                    speed: 10,   //initial speed: the number of points the processor will add per second
+                    fuelTankCapacity:10,      //initial fuelTank capacity. this indicates how many seconds the processor can run before it needs to be refueled.
+                    life: 180   //how long the processor will run before it is removed.
                 }
         };
 
+        // EDIT [2025-08-25]: Local persistence via localStorage - AA
+        const STORAGE_KEY = "click_n_growth_save_v1";
+
+        function saveGame() {
+            try {
+                const processors = gameData.processors.map(p => {
+                    const { interval, ...rest } = p;
+                    return { ...rest, isRunning: false };
+                });
+                const snapshot = {
+                    points: gameData.points,
+                    fuel: gameData.fuel,
+                    fuelPrice: gameData.fuelPrice,
+                    processors
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+            } catch (err) {
+                console.error("Failed to save game", err);
+            }
+        }
+
+        function loadGame() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return;
+                const data = JSON.parse(raw);
+                if (!data || typeof data !== "object") return;
+
+                gameData.points = typeof data.points === "number" ? data.points : gameData.points;
+                gameData.fuel = typeof data.fuel === "number" ? data.fuel : gameData.fuel;
+                gameData.fuelPrice = typeof data.fuelPrice === "number" ? data.fuelPrice : gameData.fuelPrice;
+
+                // Clear existing UI and state
+                const container = document.querySelector('.main-container');
+                if (container) container.innerHTML = '';
+                gameData.processors = [];
+
+                if (Array.isArray(data.processors)) {
+                    data.processors.forEach(saved => {
+                        const restored = {
+                            id: saved.id || Date.now() + Math.random(),
+                            speed: typeof saved.speed === 'number' ? saved.speed : gameData.init.speed,
+                            isRunning: false,
+                            fuelTankCapacity: typeof saved.fuelTankCapacity === 'number' ? saved.fuelTankCapacity : gameData.init.fuelTankCapacity,
+                            fuelRemaining: typeof saved.fuelRemaining === 'number' ? saved.fuelRemaining : gameData.init.fuelTankCapacity,
+                            lifeMax: typeof saved.lifeMax === 'number' ? saved.lifeMax : gameData.init.life,
+                            lifeRemaining: typeof saved.lifeRemaining === 'number' ? saved.lifeRemaining : gameData.init.life,
+                            speedUpgradeCost: typeof saved.speedUpgradeCost === 'number' ? saved.speedUpgradeCost : gameData.init.speedUpgradeCost,
+                            fuelTankUpgradeCost: typeof saved.fuelTankUpgradeCost === 'number' ? saved.fuelTankUpgradeCost : gameData.init.fuelTankUpgradeCost,
+                            lifeUpgradeCost: typeof saved.lifeUpgradeCost === 'number' ? saved.lifeUpgradeCost : gameData.init.lifeUpgradeCost,
+                            repairCost: typeof saved.repairCost === 'number' ? saved.repairCost : gameData.init.repairCost,
+                            repairs: typeof saved.repairs === 'number' ? saved.repairs : 0,
+                            levels: saved.levels && typeof saved.levels === 'object' ? {
+                                speed: saved.levels.speed || 1,
+                                fuelTank: saved.levels.fuelTank || 1,
+                                life: saved.levels.life || 1
+                            } : { speed: 1, fuelTank: 1, life: 1 },
+                            interval: null
+                        };
+                        // Push first, then render
+                        gameData.processors.push(restored);
+                        createProcessor(gameData.init, restored);
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to load game", err);
+            }
+        }
+
+        // EDIT [2025-08-25]: Load saved game, sync UI with state and improve a11y - AA
+        loadGame();
+        pointDisplay.innerText = gameData.points;
+        pointDisplay.parentElement.setAttribute("aria-live", "polite");
+
+        btnAddProcessor.textContent = `Add Processor (-${gameData.init.processorCost} points)`;
 
         btnAddProcessor.addEventListener("click", e => {
 
@@ -46,7 +122,7 @@
                 pointDisplay.innerText = gameData.points;
             } else {
                 if(gameData.processors.length>0) {
-                    alert("You need 500 points to add a processor.")
+                    alert(`You need ${gameData.init.processorCost} points to add a processor.`)
                 } else {
                     alert("Game Over.");
                 }
@@ -56,28 +132,36 @@
         })
 
 
-        function createProcessor(init) {
+        function createProcessor(init, existingData) {
 
-            let duration = 10;
-
-            let processorData = {
+            let processorData = existingData ? existingData : {
                 id: Date.now(),
-                automatorDur: init.automator,     // in seconds
-                speed: init.speed,    //3 pt per second.
-                timerRemain: init.automator,
+                speed: init.speed,    // points per second
                 isRunning: false,
-                life: init.life,       // duration in seconds.
-                processorCost: init.processorCost,
-                speedCost: init.speedCost,
-                automatorCost: init.automatorCost,
-                processorLvl: 1,
-                upgradeLvl: {
+                // Fuel tank model replaces automator
+                fuelTankCapacity: init.fuelTankCapacity, // seconds of run time per full tank
+                fuelRemaining: init.fuelTankCapacity,
+                // Life model (depletes only while running)
+                lifeMax: init.life,
+                lifeRemaining: init.life,
+                // Costs (per-processor, scale with level)
+                speedUpgradeCost: init.speedUpgradeCost,
+                fuelTankUpgradeCost: init.fuelTankUpgradeCost,
+                lifeUpgradeCost: init.lifeUpgradeCost,
+                repairCost: init.repairCost,
+                repairs: 0,
+                // Levels
+                levels: {
                     speed: 1,
-                    automator: 1
-                }
-            }
+                    fuelTank: 1,
+                    life: 1
+                },
+                interval: null
+            };
 
-            gameData.processors.push(processorData);
+            if (!existingData) {
+                gameData.processors.push(processorData);
+            }
 
             new JDom({
                 type: "div",
@@ -88,139 +172,187 @@
                 children: [
                     {
                         type: "p",
-                        conent: `${processorData.speed} pt/min`
+                        content: `Speed: ${processorData.speed} pt/sec`,
+                        attr: { className: "processor-speed-display" }
                     },
                     {
                         type: "p",
-                        content: `${processorData.automatorDur} min`,
-                        attr: {
-                            className: "processor-time"
-                        }
+                        content: `Fuel: ${processorData.fuelRemaining}/${processorData.fuelTankCapacity} s`,
+                        attr: { className: "processor-fuel" }
+                    },
+                    {
+                        type: "p",
+                        content: `Life: ${processorData.lifeRemaining}/${processorData.lifeMax} s`,
+                        attr: { className: "processor-life" }
                     },
                     {
                         type: "button",
-                        content: `+Duration: ${processorData.automatorDur}`,
+                        content: "Run",
+                        attr: { className: "btn-run" },
                         events: {
                             click: e => {
-
+                                const runBtn = e.target;
                                 if (processorData.isRunning) {
-                                    alert("Wait. You cannot upgrade a running processor. ");
+                                    // Pause
+                                    clearInterval(processorData.interval);
+                                    processorData.interval = null;
+                                    processorData.isRunning = false;
+                                    runBtn.textContent = "Run";
+                                    saveGame();
                                 } else {
-
-                                    if (gameData.points >= processorData.automatorCost) {
-
-                                        processorData.upgradeLvl.automator ++;
-                                        gameData.points -= processorData.automatorCost;
-                                        processorData.automatorDur = Math.round(processorData.automatorDur * 2);
-
-                                        processorData.automatorCost = processorData.automatorCost * processorData.upgradeLvl.automator;
-                                        pointDisplay.innerText = gameData.points;
-                                        processorData.timerRemain = processorData.automatorDur;
-                                        document.querySelector(`#processor_${processorData.id} .processor-time`).innerHTML = processorData.timerRemain;
-                                        e.target.innerText = `+Duration: ${processorData.automatorDur}`;
-
-                                        console.log(processorData);
-
-                                    } else {
-                                        alert("You don't have enough points.")
-                                    }
-
-                                }
-                            }
-                        }
-                    },
-                    {
-                        type: "button",
-                        content: `+ Speed: ${processorData.speed}`,
-                        events: {
-                            click: e => {
-
-                                if (processorData.isRunning) {
-
-                                    alert("Wait. You cannot upgrade a running processor. ");
-
-                                } else {
-
-                                    if (gameData.points >= processorData.speedCost) {
-                                        
-                                        gameData.points -= processorData.speedCost;
-                                        processorData.upgradeLvl.speed ++;
-                                        processorData.speed = Math.round(processorData.speed * 2);
-
-                                        processorData.speedCost = processorData.speed * processorData.speed;
-                                        pointDisplay.innerText = gameData.points;
-                                        e.target.innerText = `+ Speed: ${processorData.speed}`;
-
-                                        console.log(processorData);
-
-                                    } else {
-                                        alert("You don't have enough points.")
-                                    }
-
-                                }
-                            }
-                        }
-                    },
-                    {
-                        type: "button",
-                        content: "Start Processor",
-                        attr: {
-                            className: "btn-active"
-                        },
-                        events: {
-                            click: e => {
-
-                                if (processorData.isRunning) {
-                                    alert("The processor is running now. Please wait until it finish the job.");
-                                } else {
-                                    e.target.classList.remove("btn-active");
-                                    let countDown;
-
-                                    countDown = setInterval(() => {
-
-                                        const processTimer = document.querySelector(`#processor_${processorData.id} .processor-time`)
-
-                                        processorData.isRunning = true;
-                                        processorData.timerRemain--;
-                                        if(processTimer !== null) {
-                                            processTimer.innerHTML = processorData.timerRemain;
-                                        }
-
-                                        addPoint(processorData.speed);
-
-                                        if (processorData.timerRemain <= 0) {
-                                            clearInterval(countDown);
-                                            processorData.timerRemain = processorData.automatorDur;
+                                    // Start running
+                                    processorData.isRunning = true;
+                                    runBtn.textContent = "Pause";
+                                    processorData.interval = setInterval(() => {
+                                        // Consume fuel and life when running
+                                        if (processorData.fuelRemaining > 0 && processorData.lifeRemaining > 0) {
+                                            processorData.fuelRemaining--;
+                                            processorData.lifeRemaining--;
+                                            addPoint(processorData.speed);
+                                        } else {
+                                            // Auto-pause when out of fuel or life
+                                            clearInterval(processorData.interval);
+                                            processorData.interval = null;
                                             processorData.isRunning = false;
-                                            console.log("The processor is stopped.");
-
-                                            if (gameData.points < gameData.init.processorCost && gameData.processors.length === 0) {
-                                                alert("You don't have enough points to continue. Game Over.");
-                                            }
-
+                                            runBtn.textContent = "Run";
                                         }
+
+                                        // Update displays
+                                        const root = document.getElementById(`processor_${processorData.id}`);
+                                        const fuelEle = root.querySelector('.processor-fuel');
+                                        const lifeEle = root.querySelector('.processor-life');
+                                        if (fuelEle) fuelEle.textContent = `Fuel: ${processorData.fuelRemaining}/${processorData.fuelTankCapacity} s`;
+                                        if (lifeEle) lifeEle.textContent = `Life: ${processorData.lifeRemaining}/${processorData.lifeMax} s`;
+                                        saveGame();
                                     }, 1000);
                                 }
+                            }
+                        }
+                    },
+                    {
+                        type: "button",
+                        content: "Add Fuel",
+                        events: {
+                            click: () => {
+                                const needed = processorData.fuelTankCapacity - processorData.fuelRemaining;
+                                if (needed <= 0) return;
+                                const cost = needed * gameData.fuelPrice;
+                                if (gameData.points >= cost) {
+                                    gameData.points -= cost;
+                                    processorData.fuelRemaining = processorData.fuelTankCapacity;
+                                    pointDisplay.innerText = gameData.points;
+                                    const root = document.getElementById(`processor_${processorData.id}`);
+                                    const fuelEle = root.querySelector('.processor-fuel');
+                                    if (fuelEle) fuelEle.textContent = `Fuel: ${processorData.fuelRemaining}/${processorData.fuelTankCapacity} s`;
+                                    saveGame();
+                                } else {
+                                    alert(`Not enough points. Need ${cost}`);
+                                }
+                            }
+                        }
+                    },
+                    {
+                        type: "button",
+                        content: `Repair (-${processorData.repairCost})`,
+                        events: {
+                            click: () => {
+                                if (processorData.lifeRemaining === processorData.lifeMax) return;
 
+                                // Dynamic repair cost based on usage and levels
+                                const base = processorData.repairCost;
+                                const repairsFactor = 1 + (processorData.repairs || 0) * 0.25;
+                                const levelFactor = 1 + (processorData.levels.speed + processorData.levels.fuelTank + processorData.levels.life - 3) * 0.1;
+                                const speedFactor = 1 + (processorData.speed / 10 - 1) * 0.2; // normalized to initial 10
+                                const lifeFactor = 1 + (processorData.lifeMax / 180 - 1) * 0.3; // normalized to initial 180
+                                const dynamicRepairCost = Math.ceil(base * repairsFactor * levelFactor * speedFactor * lifeFactor);
 
+                                if (gameData.points >= dynamicRepairCost) {
+                                    gameData.points -= dynamicRepairCost;
+                                    processorData.lifeRemaining = processorData.lifeMax;
+                                    processorData.repairs = (processorData.repairs || 0) + 1;
+                                    pointDisplay.innerText = gameData.points;
+                                    const root = document.getElementById(`processor_${processorData.id}`);
+                                    const lifeEle = root.querySelector('.processor-life');
+                                    if (lifeEle) lifeEle.textContent = `Life: ${processorData.lifeRemaining}/${processorData.lifeMax} s`;
+                                    // Update button label to reflect current dynamic cost
+                                    const repairBtn = Array.from(root.querySelectorAll('button')).find(b => b.textContent.startsWith('Repair'));
+                                    if (repairBtn) repairBtn.textContent = `Repair (-${Math.ceil(base * (1 + processorData.repairs * 0.25) * levelFactor * speedFactor * lifeFactor)})`;
+                                    saveGame();
+                                } else {
+                                    alert(`Not enough points. Need ${dynamicRepairCost}`);
+                                }
+                            }
+                        }
+                    },
+                    {
+                        type: "button",
+                        content: "Upgrade",
+                        events: {
+                            click: () => {
+                                const root = document.getElementById(`processor_${processorData.id}`);
+                                let popup = root.querySelector('.upgrade-popup');
+                                if (popup) { popup.remove(); return; }
+                                popup = new JDom({
+                                    type: 'div',
+                                    attr: { className: 'upgrade-popup' },
+                                    children: [
+                                        { type: 'button', attr: { className: 'popup-close' }, content: '✕', events: { click: (e) => { e.target.closest('.upgrade-popup').remove(); } } },
+                                        { type: 'button', content: `Upgrade Speed Lvl ${processorData.levels.speed} → ${processorData.levels.speed+1} (-${processorData.speedUpgradeCost})`, events: { click: () => {
+                                            if (gameData.points >= processorData.speedUpgradeCost) {
+                                                gameData.points -= processorData.speedUpgradeCost;
+                                                processorData.levels.speed++;
+                                                processorData.speed = Math.round(processorData.speed * 2);
+                                                processorData.speedUpgradeCost = processorData.speedUpgradeCost * processorData.levels.speed;
+                                                pointDisplay.innerText = gameData.points;
+                                                root.querySelector('.processor-speed-display').textContent = `Speed: ${processorData.speed} pt/sec`;
+                                                root.querySelector('.upgrade-popup')?.remove();
+                                                saveGame();
+                                            } else { alert('Not enough points.'); }
+                                        } } },
+                                        { type: 'button', content: `Upgrade Fuel Tank Lvl ${processorData.levels.fuelTank} → ${processorData.levels.fuelTank+1} (-${processorData.fuelTankUpgradeCost})`, events: { click: () => {
+                                            if (gameData.points >= processorData.fuelTankUpgradeCost) {
+                                                gameData.points -= processorData.fuelTankUpgradeCost;
+                                                processorData.levels.fuelTank++;
+                                                processorData.fuelTankUpgradeCost = processorData.fuelTankUpgradeCost * processorData.levels.fuelTank;
+                                                processorData.fuelTankCapacity = processorData.fuelTankCapacity * 2;
+                                                processorData.fuelRemaining = processorData.fuelTankCapacity;
+                                                pointDisplay.innerText = gameData.points;
+                                                root.querySelector('.processor-fuel').textContent = `Fuel: ${processorData.fuelRemaining}/${processorData.fuelTankCapacity} s`;
+                                                root.querySelector('.upgrade-popup')?.remove();
+                                                saveGame();
+                                            } else { alert('Not enough points.'); }
+                                        } } },
+                                        { type: 'button', content: `Upgrade Life Lvl ${processorData.levels.life} → ${processorData.levels.life+1} (-${processorData.lifeUpgradeCost})`, events: { click: () => {
+                                            if (gameData.points >= processorData.lifeUpgradeCost) {
+                                                gameData.points -= processorData.lifeUpgradeCost;
+                                                processorData.levels.life++;
+                                                processorData.lifeUpgradeCost = processorData.lifeUpgradeCost * processorData.levels.life;
+                                                processorData.lifeMax += 60; // +1 minute
+                                                processorData.lifeRemaining = processorData.lifeMax;
+                                                pointDisplay.innerText = gameData.points;
+                                                root.querySelector('.processor-life').textContent = `Life: ${processorData.lifeRemaining}/${processorData.lifeMax} s`;
+                                                root.querySelector('.upgrade-popup')?.remove();
+                                                saveGame();
+                                            } else { alert('Not enough points.'); }
+                                        } } }
+                                    ]
+                                }).elements;
+                                root.append(popup);
                             }
                         }
                     }
                 ]
             }).render(".main-container");
 
-            setTimeout(() => {
-                document.querySelector(`#processor_${processorData.id}`).remove();
-                gameData.processors = gameData.processors.filter(obj => {
-                    return obj.id !== processorData.id;
-                });
-            }, processorData.life * 1000);
+            // Remove processor when life reaches zero (handled by run loop).
 
         }
 
         function addPoint(speed) {
             gameData.points += speed;
             pointDisplay.innerText = gameData.points;
+            // Persist often so users don't lose progress on refresh/close.
+            saveGame();
         }
 
     </script>

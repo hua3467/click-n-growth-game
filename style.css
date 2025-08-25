@@ -1,0 +1,151 @@
+/* EDIT [2025-08-25]: New playful visual style and grid layout - AA */
+
+:root {
+    --bg: #0f172a;
+    --bg-accent: #111827;
+    --card: #0b1220;
+    --card-border: rgba(255, 255, 255, 0.08);
+    --text: #e5e7eb;
+    --muted: #a5b4fc;
+    --brand: #22d3ee;
+    --brand-2: #a78bfa;
+    --good: #34d399;
+    --warn: #f59e0b;
+    --bad: #f87171;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    color: var(--text);
+    background: radial-gradient(1200px 600px at 10% -10%, #1e293b 0%, transparent 60%),
+                radial-gradient(1200px 600px at 110% 10%, #1f2937 0%, transparent 60%),
+                linear-gradient(180deg, var(--bg) 0%, var(--bg-accent) 100%);
+}
+
+/* Container grid for processors */
+.main-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 420px);
+    justify-content: center;
+    gap: 16px;
+    padding: 16px;
+}
+
+/* Processor card */
+.card-processor {
+    height: 170px;;
+    width: 390px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid var(--card-border);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    position: relative;
+    overflow: hidden;
+}
+
+.card-processor::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(600px 120px at -10% -20%, rgba(34,211,238,0.15), transparent 60%),
+                radial-gradient(600px 120px at 110% 120%, rgba(167,139,250,0.15), transparent 60%);
+}
+
+.card-processor p {
+    margin: 6px 0;
+}
+
+.processor-speed-display {
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.processor-fuel {
+    color: var(--brand);
+}
+
+.processor-life {
+    color: var(--good);
+}
+
+/* Buttons */
+.card-processor button {
+    background: linear-gradient(180deg, var(--brand), var(--brand-2));
+    color: #0b1020;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+    box-shadow: 0 6px 14px rgba(34,211,238,0.25);
+    margin-right: 8px;
+    margin-top: 8px;
+}
+
+.card-processor button:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+}
+
+.card-processor .btn-run {
+    background: linear-gradient(180deg, #10b981, #34d399);
+    color: #06271f;
+    box-shadow: 0 6px 14px rgba(16,185,129,0.25);
+}
+
+/* Upgrade popup */
+.upgrade-popup {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    top: 4px;
+    background: rgba(2, 6, 23, 0.98);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 12px 12px 16px 12px;
+    z-index: 50; /* ensure fully visible above content */
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+    max-height: 90vh;
+    overflow: auto;
+}
+
+.upgrade-popup .popup-close {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #ef4444, #f87171);
+    color: #210606;
+    box-shadow: 0 6px 14px rgba(248,113,113,0.25);
+}
+
+.upgrade-popup button {
+    width: 270px;
+    text-align: left;
+}
+
+/* Page controls */
+#points {
+    margin: 16px;
+}
+
+#btnAddProcessor {
+    margin: 0 16px 8px 16px;
+    padding: 10px 14px;
+    font-weight: 700;
+    border: 0;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #fbbf24, #f59e0b);
+    color: #231b05;
+    box-shadow: 0 6px 14px rgba(245,158,11,0.25);
+}
